@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -24,8 +23,17 @@ type Request struct {
 }
 
 type Response struct {
+	Base64     bool          `json:"isBase64Encoded"`
+	StatusCode int           `json:"statusCode"`
+	Headers    *headerStruct `json:"headers"`
+	Body       *dataStruct   `json:"body"`
+}
+type dataStruct struct {
 	Data []string `json:"data"`
-	Ok   bool
+}
+
+type headerStruct struct {
+	Headertype string `json:"Content-Type"`
 }
 
 type configStruct struct {
@@ -34,7 +42,7 @@ type configStruct struct {
 	Password string `json:"password"`
 }
 
-//go away
+/*
 func ReadConfig() error {
 
 	file, err := ioutil.ReadFile("./config.json")
@@ -48,7 +56,7 @@ func ReadConfig() error {
 
 	if err != nil {
 		fmt.Println(err.Error())
-		return err
+		return errfmt.Sprintf(
 	}
 	address = config.Address
 	user = config.User
@@ -56,11 +64,13 @@ func ReadConfig() error {
 
 	return nil
 }
+*/
 
 func queryMaria(req Request) (array []string) {
 	//ReadConfig()
 	//select temperature from b827eb06efa4 where datetime like '08/03/2018%';
-	selectData := "select " + req.Datatype + " from " + req.MAC + " where datetime like " + req.Date + " %"
+	selectData := `SELECT ` + req.Datatype + ` FROM ` + req.MAC + ` WHERE dateTime LIKE "` + req.Date + `%";`
+	//selectData := `SELECT temperature FROM b827eb06efa4 WHERE datetime LIKE "08/03/2018%";`
 	user := os.Getenv("user")
 	password := os.Getenv("password")
 	address := os.Getenv("address")
@@ -86,17 +96,15 @@ func queryMaria(req Request) (array []string) {
 
 //Don't know if this needs to be exported or not, probably not though
 
-func handleRequest(request Request) []byte {
+func handleRequest(ctx context.Context, request Request) (Response, error) {
 	data := queryMaria(request)
-	var response *Response
-	response.Data = data
-	response.Ok = true
-
-	r, err := json.Marshal(response)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return r
+	return Response{
+			Base64:     false,
+			StatusCode: 200,
+			Headers:    &headerStruct{Headertype: "application/json"},
+			Body:       &dataStruct{Data: data},
+		},
+		nil
 }
 
 func main() {
