@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
@@ -14,11 +16,12 @@ var (
 )
 
 type dataRequest struct {
+	MAC      string `json:"mac"`
 	Date     string `json:"date"`
 	Datatype string `json:"datatype"`
 }
 
-type dataAnswer struct {
+type dataResponse struct {
 	Date     string   `json:"date"`
 	Datatype string   `json:"datatype"`
 	Data     []string `json:"data"`
@@ -53,15 +56,17 @@ func ReadConfig() error {
 	return nil
 }
 
-func mariaConnect() {
+func mariaConnect(req *dataRequest) {
 	ReadConfig()
-	db, err := sql.Open("mysql", user+":"+password+"@tcp("+address+":3306)/sensored")
+	//select temperature from b827eb06efa4 where datetime like '08/03/2018%';
+	selectData := fmt.Sprintf("select %s from %s where datetime like %s%", req.Datatype, req.MAC, req.Date)
+	db, err := sql.Open("mysql", user+":"+password+"@tcp("+address+":3306)/SensorEdAWS")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 	defer db.Close()
 	var version string
-	db.QueryRow("SELECT VERSION()").Scan(&version)
+	db.QueryRow(selectData)
 	fmt.Println("Connected to:", version)
 }
 
