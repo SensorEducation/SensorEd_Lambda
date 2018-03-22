@@ -1,12 +1,13 @@
 package main
 
 import (
-	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -17,16 +18,16 @@ var (
 )
 
 type Request struct {
-	MAC      string `json:"mac"`
-	Date     string `json:"date"`
-	Datatype string `json:"datatype"`
+	MAC      string `json:\"mac\"`
+	Date     string `json:\"date\"`
+	Datatype string `json:\"datatype\"`
 }
 
 type Response struct {
 	Base64     bool          `json:"isBase64Encoded"`
 	StatusCode int           `json:"statusCode"`
 	Headers    *headerStruct `json:"headers"`
-	Body       *dataStruct   `json:"body"`
+	Body       string        `json:"body"`
 }
 type dataStruct struct {
 	Data []string `json:"data"`
@@ -96,13 +97,23 @@ func queryMaria(req Request) (array []string) {
 
 //Don't know if this needs to be exported or not, probably not though
 
-func handleRequest(ctx context.Context, request Request) (Response, error) {
+func handleRequest(req events.APIGatewayProxyRequest) (Response, error) {
+	var request Request
+	err := json.Unmarshal([]byte(req.Body), &request)
+	if err != nil {
+		log.Fatal(err)
+	}
 	data := queryMaria(request)
+	dataResp, err := json.Marshal(&dataStruct{Data: data})
+	if err != nil {
+		log.Fatal(err)
+	}
+	//stringResp, err := json.Marshal(&dataStruct{Data: data})
 	return Response{
 			Base64:     false,
 			StatusCode: 200,
 			Headers:    &headerStruct{Headertype: "application/json"},
-			Body:       &dataStruct{Data: data},
+			Body:       string(dataResp),
 		},
 		nil
 }
