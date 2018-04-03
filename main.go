@@ -30,10 +30,13 @@ type Response struct {
 	Body       string        `json:"body"`
 }
 type dataStruct struct {
-	Data []string `json:"data"`
+	Data []float64 `json:"data"`
+	Time []string  `json:"time"`
 }
 
 type headerStruct struct {
+	Methods    string `json:"Access-Control-Allow-Methods"`
+	CORS       string `json:"Access-Control-Allow-Origin"`
 	Headertype string `json:"Content-Type"`
 }
 
@@ -67,10 +70,10 @@ func ReadConfig() error {
 }
 */
 
-func queryMaria(req Request) (array []string) {
+func queryMaria(req Request) (data []float64, time []string) {
 	//ReadConfig()
 	//select temperature from b827eb06efa4 where datetime like '08/03/2018%';
-	selectData := `SELECT ` + req.Datatype + ` FROM ` + req.MAC + ` WHERE dateTime LIKE "` + req.Date + `%";`
+	selectData := `SELECT ` + req.Datatype + `, timeNow FROM ` + req.MAC + ` WHERE dateNow="` + req.Date + `";`
 	//selectData := `SELECT temperature FROM b827eb06efa4 WHERE datetime LIKE "08/03/2018%";`
 	user := os.Getenv("user")
 	password := os.Getenv("password")
@@ -80,19 +83,24 @@ func queryMaria(req Request) (array []string) {
 		fmt.Println(err.Error())
 	}
 	defer db.Close()
-	var Data []string
+	var Data []float64
+	var Time []string
 	rows, err := db.Query(selectData)
 	if err != nil {
 		log.Fatal(err)
 	}
 	for rows.Next() {
-		err = rows.Scan(&req.Datatype)
+		var data float64
+		var time string
+		err = rows.Scan(&data, &time)
 		if err != nil {
 			panic(err)
 		}
-		Data = append(Data, req.Datatype)
+
+		Data = append(Data, data)
+		Time = append(Time, time)
 	}
-	return Data
+	return Data, Time
 }
 
 //Don't know if this needs to be exported or not, probably not though
@@ -103,8 +111,8 @@ func handleRequest(req events.APIGatewayProxyRequest) (Response, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	data := queryMaria(request)
-	dataResp, err := json.Marshal(&dataStruct{Data: data})
+	data, time := queryMaria(request)
+	dataResp, err := json.Marshal(&dataStruct{Data: data, Time: time})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -112,7 +120,7 @@ func handleRequest(req events.APIGatewayProxyRequest) (Response, error) {
 	return Response{
 			Base64:     false,
 			StatusCode: 200,
-			Headers:    &headerStruct{Headertype: "application/json"},
+			Headers:    &headerStruct{Headertype: "application/json", CORS: "*", Methods: "*"},
 			Body:       string(dataResp),
 		},
 		nil
